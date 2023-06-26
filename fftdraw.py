@@ -18,7 +18,7 @@ Left click to add a data point;
 Right click to add a solitary peak;
 Enter to hear the sound.
 """
-print("FFTdraw: draw a spectrogram and hear how it goes. Type help for help.")
+print("FFTdraw: draw a spectrum and hear how it goes. Type help for help.")
 def input_params():
     param_string = input("Parameters > ").lower()
     defaults = ["800", "4410", "n", "0", "None"]
