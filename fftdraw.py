@@ -3,6 +3,7 @@ This is the version before switching to matplotlib.
 It used a png file (fftdraw.png) for input.
 Extra parameter input prompts were scattered all around.
 It worked too, though in a very inelegant way.
+This is a testament to my bad programming skills.
 """
 
 from pydub import AudioSegment
@@ -57,7 +58,7 @@ def read_plot():
         return(value)
     #}
     try:
-        plot = Image.open("./0-fftdraw.png").convert("L")
+        plot = Image.open("./fftdraw.png").convert("L")
     except FileNotFoundError:
         file_not_found()
 
