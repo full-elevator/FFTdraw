@@ -1,3 +1,5 @@
+# gabliwoz v. to optimize smth; to cause smth to cease to work
+
 from pydub import AudioSegment
 from pydub.playback import play
 from pydub.effects import normalize
@@ -20,11 +22,11 @@ Enter to hear the sound.
 """
 print("FFTdraw: draw a spectrum and hear how it goes. Type help for help.")
 def input_params():
+    """Take a string to set parameters for the sound."""
     param_string = input("Parameters > ").lower()
     defaults = ["800", "4410", "n", "0", "None"]
     params = param_string.split(" ")
     try:
-        #Add default values to an input with params omitted.
         while len(params)!=5:
             params.append(defaults[len(params)])
         
@@ -36,6 +38,9 @@ def input_params():
         effects = params[2]
         plot_domain = int(params[3])
         out_path = params[4]
+        if lim_x>fft_length:
+            print("The right limit must be smaller than or equal to the FFT length.")
+            return(input_params())
         if out_path[-4]!="." and out_path!="None":
             out_path += ".wav"
         print("The parameters are", params)
@@ -45,6 +50,7 @@ def input_params():
         return(input_params())
 
 class LineSegment:
+    """Defines the two line segments in the plotting area."""
     def __init__(self, Line):
         self.X = [0, lim_x]
         self.Y = [0.0, 0.0]
@@ -57,13 +63,18 @@ class LineSegment:
         A_scaled = scale_data(A, resolution)
         return(A_scaled)
     def insert_value(self, x, y):
+        """Insert a waypoint at (x,y). Called on left click."""
         index = 0
         while x>self.X[index] and index<len(self.X)-1:
             index += 1
-        self.X.insert(index, x)
-        self.Y.insert(index, y)
+        self.X = np.insert(self.X, index, x)
+        self.Y = np.insert(self.Y, index, y)
         self.line.set_data(self.X, self.Y)
     def insert_peaks(self, x, y):
+        """
+        Insert a solitary peak at (x,y).
+        Called on right click when there are no defined values in x-1, x, or x+1.
+        """
         index = 0
         while x>self.X[index] and index<len(self.X)-1:
             index += 1
@@ -72,22 +83,24 @@ class LineSegment:
         self.line.set_data(self.X, self.Y)
 
 def detect_keyboard(event):
-    #Detects the Enter key press to terminate the drawing.
+    """Detect the Enter key press to terminate the drawing."""
     if event.key=="enter":
-        print("finished drawing with", len(Real.X), "points")
+        print("Finished drawing with", len(Real.X), "points")
         reals = Real.linearize_data()
         imags = Imag.linearize_data()
         if sum(imags)==0:
             print("Imaginary part is empty, default to equate real part")
             imags = reals
         samples_fft = np.zeros((fft_length,), dtype=complex)
+        vertical_scale = 80000 / lim_x     #prevent overflow
         for i in range(len(reals)):
-            samples_fft[i] = complex(100*reals[i], 100*imags[i])
+            samples_fft[i] = complex(vertical_scale*reals[i],
+                                     vertical_scale*imags[i])
         plt.close()
         convert_to_sound(samples_fft, fft_length)
         
 def detect_mouse(event):
-    #Detects any mouse clicks in the drawing area.
+    """Detect any mouse clicks in the drawing area."""
     if event.inaxes==ax1:
         ax = "real"
     elif event.inaxes==ax2:
@@ -111,13 +124,14 @@ def detect_mouse(event):
             lines[ax].insert_peaks(x, y)
     
 def lengthen_samples(samples, loops):
+    """Concatenate multiple samples to make the resulting sound audible."""
     s_out = array("h", [])
     for i in range(loops):
         s_out = s_out + samples
     return(s_out)
 
 def scale_data(values, resolution=10):
-    #Scales the user input to calibrate to the desired frequency
+    """Scales the user input to calibrate to the desired frequency."""
     i = 0
     values_rar = array("h", [])
     while i<len(values):
@@ -125,13 +139,12 @@ def scale_data(values, resolution=10):
             values_clip = values[i:i+resolution]
         except IndexError:
             values_clip = values[i:]
-            #print(values_clip)
-        values_rar.append(max(values_clip))
-        #preserve the peak
+        values_rar.append(max(values_clip)) #max() preserve the peak
         i += resolution
     return(values_rar)
 
-def convert_to_sound(samples_fft, fft_length): 
+def convert_to_sound(samples_fft, fft_length):
+    """Convert scaled data to sound."""
     def plot_samples(start, end):
         fig = plt.figure(2, figsize=(8.0,5.4))
         Y = samples[start:end]
@@ -178,6 +191,3 @@ lines = {"real":Real, "imag":Imag}
 fig.canvas.mpl_connect("key_press_event", detect_keyboard)
 fig.canvas.mpl_connect("button_press_event", detect_mouse)
 plt.show()
-
-
-# gabliwoz v. to optimize smth; to cause smth to cease to work
