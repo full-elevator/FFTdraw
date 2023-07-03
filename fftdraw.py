@@ -1,5 +1,3 @@
-# gabliwoz v. to optimize smth; to cause smth to cease to work
-
 from pydub import AudioSegment
 from pydub.playback import play
 from pydub.effects import normalize
@@ -18,14 +16,22 @@ Input the parameters in the following order, separated by a space:
 
 Left click to add a data point;
 Right click to add a solitary peak;
+Press "r" or "(" to smoothen the real part curve;
+Press "i" or ")" to smoothen the imaginary part curve;
 Enter to hear the sound.
+
+Try entering "800 800" for the parameters to remove jitter.
 """
+
 print("FFTdraw: draw a spectrum and hear how it goes. Type help for help.")
 def input_params():
     """Take a string to set parameters for the sound."""
     param_string = input("Parameters > ").lower()
     defaults = ["800", "4410", "n", "0", "None"]
     params = param_string.split(" ")
+    #remove the empty string
+    if not params[0]:
+        params.pop(0)
     try:
         while len(params)!=5:
             params.append(defaults[len(params)])
@@ -55,21 +61,27 @@ class LineSegment:
         self.X = [0, lim_x]
         self.Y = [0.0, 0.0]
         self.line = Line #matplotlib line2D object
+        
     def linearize_data(self):
-        A = array("h", [])
-        for i in range(len(self.X)-1):
-            k = (self.Y[i+1]-self.Y[i])/(self.X[i+1]-self.X[i])
-            A += array("h", [int(self.Y[i] + k*j) for j in range(0, self.X[i+1]-self.X[i])])
-        A_scaled = scale_data(A, resolution)
-        return(A_scaled)
+        """Interpolate the waypoints to an array."""
+        freq_scale = np.arange(0, lim_x, dtype=int)
+        results = np.interp(freq_scale, xp=self.X, fp=self.Y)
+        results_scaled = scale_data(results, resolution)
+        return(results_scaled)
+    
     def insert_value(self, x, y):
         """Insert a waypoint at (x,y). Called on left click."""
         index = 0
         while x>self.X[index] and index<len(self.X)-1:
             index += 1
-        self.X = np.insert(self.X, index, x)
-        self.Y = np.insert(self.Y, index, y)
+        if x in self.X:
+            self.X[index] = x
+            self.Y[index] = y
+        else:
+            self.X = np.insert(self.X, index, x)
+            self.Y = np.insert(self.Y, index, y)
         self.line.set_data(self.X, self.Y)
+
     def insert_peaks(self, x, y):
         """
         Insert a solitary peak at (x,y).
@@ -78,13 +90,30 @@ class LineSegment:
         index = 0
         while x>self.X[index] and index<len(self.X)-1:
             index += 1
-        self.X = np.insert(self.X, index, [x-1,x,x+1])
-        self.Y = np.insert(self.Y, index, [0,y,0])
+        if x in self.X or x-1 in self.X or x+1 in self.X:
+            self.X[index] = x
+            self.Y[index] = y
+        else:
+            self.X = np.insert(self.X, index, [x-1,x,x+1])
+            self.Y = np.insert(self.Y, index, [0,y,0])
+        self.line.set_data(self.X, self.Y)
+
+    def make_smooth_curve(self):
+        self.X, self.Y = quadratic_smooth(self.X, self.Y)
         self.line.set_data(self.X, self.Y)
 
 def detect_keyboard(event):
-    """Detect the Enter key press to terminate the drawing."""
-    if event.key=="enter":
+    """
+    Detect (, ), r, i key presses to smoothen the curve, and
+    detect the Enter key press to terminate the drawing.
+    """
+    if event.key=="(" or event.key=="r":
+        print("Making the Real part smooth...")
+        Real.make_smooth_curve()
+    elif event.key==")" or event.key=="i":
+        print("Making the Imaginary part smooth...")
+        Imag.make_smooth_curve()
+    elif event.key=="enter":
         print("Finished drawing with", len(Real.X), "points")
         reals = Real.linearize_data()
         imags = Imag.linearize_data()
@@ -107,22 +136,67 @@ def detect_mouse(event):
         ax = "imag"
     else:
         return
-
+    x = int(event.xdata)
+    y = int(event.ydata)
     if event.button==mpl.backend_bases.MouseButton.LEFT:
-        x = int(event.xdata)
-        y = int(event.ydata)
-        if x in lines[ax].X:
-            return
-        else:
-            lines[ax].insert_value(x, y)
+        lines[ax].insert_value(x, y)
     elif event.button==mpl.backend_bases.MouseButton.RIGHT:
-        x = int(event.xdata)
-        y = int(event.ydata)
-        if x in lines[ax].X or x-1 in lines[ax].X or x+1 in lines[ax].X:
-            return
-        else:
-            lines[ax].insert_peaks(x, y)
+        lines[ax].insert_peaks(x, y)
+
+def quadratic_smooth(X, Y):
+    def eval_midpoints(A):
+        """Calculate the midpoints as the two ends of smooth curve"""
+        L = len(A)
+        A_out = np.empty((L*2-1,), dtype=float)
+        for i in range(L-1):
+            A_out[i*2] = A[i]
+            A_out[i*2+1] = (A[i]+A[i+1])/2
+        A_out[-1] = A[-1]
+        #print(A_out)
+        return(A_out)
     
+    def quadratic_curve(x_values, y_values):
+        """Smoothens the lines by calculating a quadratic curve."""
+        if len(x_values)==len(y_values)==3:
+            x1, x2, x3 = x_values
+            y1, y2, y3 = y_values
+        else:
+            raise ValueError("Expected three pairs of coordinates.")
+        
+        x2 = (x1 + 2*x2 + x3)/4
+        y2 = (y1 + 2*y2 + y3)/4
+        A = np.matrix([[x1*x1, x1, 1],
+                       [x2*x2, x2, 1],
+                       [x3*x3, x3, 1]])
+        A = A.getI()
+        vector = np.matrix([[y1],
+                            [y2],
+                            [y3]])
+        A_coeff = np.dot(A, vector)
+        return(A_coeff)
+        #np.solve can do the same
+
+    waypoints_X = eval_midpoints(X)
+    waypoints_Y = eval_midpoints(Y)
+    X_out = np.array([X[0]], dtype=int)
+    Y_out = np.array([Y[0]], dtype=float)
+    for i in range(1, len(waypoints_X)-2, 2):
+        coeff = quadratic_curve(waypoints_X[i:i+3], waypoints_Y[i:i+3])
+        if waypoints_X[i+2] - waypoints_X[i] > 60:
+            X_mot = np.arange(waypoints_X[i], waypoints_X[i+2], step=5, dtype=int)
+        else:
+            X_mot = np.arange(waypoints_X[i], waypoints_X[i+2], step=1, dtype=int)
+        Y_mot = np.empty((len(X_mot),), dtype=float)
+        for j in range(len(X_mot)):
+            Y_mot[j] = float(coeff[0])*X_mot[j]*X_mot[j] + float(coeff[1])*X_mot[j] + float(coeff[2])
+        #Y_mot = float(coeff[0])*X*X + float(coeff[1])*X + float(coeff[2])
+        # For some reason, the above line causes Y_mot to be empty sometimes...
+        X_out = np.append(X_out, X_mot)
+        Y_out = np.append(Y_out, Y_mot)
+    X_out = np.append(X_out, X[-1])
+    Y_out = np.append(Y_out, Y[-1])
+    return(X_out, Y_out)
+
 def lengthen_samples(samples, loops):
     """Concatenate multiple samples to make the resulting sound audible."""
     s_out = array("h", [])
@@ -139,7 +213,7 @@ def scale_data(values, resolution=10):
             values_clip = values[i:i+resolution]
         except IndexError:
             values_clip = values[i:]
-        values_rar.append(max(values_clip)) #max() preserve the peak
+        values_rar.append(int(max(values_clip))) #max() preserve the peak
         i += resolution
     return(values_rar)
 
