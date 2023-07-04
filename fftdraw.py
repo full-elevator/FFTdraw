@@ -10,7 +10,7 @@ help_text = """
 Input the parameters in the following order, separated by a space:
  right limit of x axis (default 800);
  n of sampling points in a single segment (default 4410);
- applied effects: f to fade out and/or n to normalize (default n);
+ applied effects: "f" to fade out and/or "n" to normalize (default "n");
  number of sampling points to plot: not plotted if 0 (default 0);
  export path: if omitted, no file is exported (default None).
 
@@ -20,7 +20,7 @@ Press "r" or "(" to smoothen the real part curve;
 Press "i" or ")" to smoothen the imaginary part curve;
 Enter to hear the sound.
 
-Try entering "800 800" for the parameters to remove jitter.
+Try setting "800 800" for the parameters to remove jitter.
 """
 
 print("FFTdraw: draw a spectrum and hear how it goes. Type help for help.")
@@ -99,7 +99,7 @@ class LineSegment:
         self.line.set_data(self.X, self.Y)
 
     def make_smooth_curve(self):
-        self.X, self.Y = quadratic_smooth(self.X, self.Y)
+        self.X, self.Y = bezier_smooth(self.X, self.Y)
         self.line.set_data(self.X, self.Y)
 
 def detect_keyboard(event):
@@ -142,57 +142,39 @@ def detect_mouse(event):
         lines[ax].insert_value(x, y)
     elif event.button==mpl.backend_bases.MouseButton.RIGHT:
         lines[ax].insert_peaks(x, y)
+    else:
+        #No dragging action, because it makes the plot glitchy
+        #and occasionally freezes the window.
+        pass
 
-def quadratic_smooth(X, Y):
-    def eval_midpoints(A):
-        """Calculate the midpoints as the two ends of smooth curve"""
-        L = len(A)
-        A_out = np.empty((L*2-1,), dtype=float)
-        for i in range(L-1):
+def bezier_smooth(X, Y):
+    """Smoothen the line segments with a composite Bézier curve."""
+    def comb_append(A):
+        """
+        Calculate the midpoints between peaks
+        to be used as the two ends of a curvelet.
+        """
+        ln = len(A)
+        A_out = np.empty((ln*2-1,))
+        for i in range(ln - 1):
             A_out[i*2] = A[i]
             A_out[i*2+1] = (A[i]+A[i+1])/2
         A_out[-1] = A[-1]
-        #print(A_out)
         return(A_out)
-    
-    def quadratic_curve(x_values, y_values):
-        """Smoothens the lines by calculating a quadratic curve."""
-        if len(x_values)==len(y_values)==3:
-            x1, x2, x3 = x_values
-            y1, y2, y3 = y_values
-        else:
-            raise ValueError("Expected three pairs of coordinates.")
-        
-        x2 = (x1 + 2*x2 + x3)/4
-        y2 = (y1 + 2*y2 + y3)/4
-        A = np.matrix([[x1*x1, x1, 1],
-                       [x2*x2, x2, 1],
-                       [x3*x3, x3, 1]])
-        A = A.getI()
-        vector = np.matrix([[y1],
-                            [y2],
-                            [y3]])
-        A_coeff = np.dot(A, vector)
-        return(A_coeff)
-        #np.solve can do the same
 
-    waypoints_X = eval_midpoints(X)
-    waypoints_Y = eval_midpoints(Y)
-    X_out = np.array([X[0]], dtype=int)
+    X_midpoints = comb_append(X)
+    Y_midpoints = comb_append(Y)
+    X_out = np.array([int(X[0])], dtype=int)
     Y_out = np.array([Y[0]], dtype=float)
-    for i in range(1, len(waypoints_X)-2, 2):
-        coeff = quadratic_curve(waypoints_X[i:i+3], waypoints_Y[i:i+3])
-        if waypoints_X[i+2] - waypoints_X[i] > 60:
-            X_mot = np.arange(waypoints_X[i], waypoints_X[i+2], step=5, dtype=int)
-        else:
-            X_mot = np.arange(waypoints_X[i], waypoints_X[i+2], step=1, dtype=int)
-        Y_mot = np.empty((len(X_mot),), dtype=float)
-        for j in range(len(X_mot)):
-            Y_mot[j] = float(coeff[0])*X_mot[j]*X_mot[j] + float(coeff[1])*X_mot[j] + float(coeff[2])
-        #Y_mot = float(coeff[0])*X*X + float(coeff[1])*X + float(coeff[2])
-        # For some reason, the above line causes Y_mot to be empty sometimes...
-        X_out = np.append(X_out, X_mot)
-        Y_out = np.append(Y_out, Y_mot)
+    for i in range(1, len(X_midpoints)-2, 2):
+        curve = mpl.bezier.BezierSegment(np.array([X_midpoints[i:i+3],
+                                         Y_midpoints[i:i+3]]).T)
+        T = np.linspace(0, 1, 20)
+        curve_dal = curve.point_at_t(T)
+        X_curve, Y_curve = np.split(np.array(curve_dal).T, 2)
+        X_out = np.append(X_out, X_curve[0])  #np.split returns a nested array
+        Y_out = np.append(Y_out, Y_curve[0])
+
     X_out = np.append(X_out, X[-1])
     Y_out = np.append(Y_out, Y[-1])
     return(X_out, Y_out)
