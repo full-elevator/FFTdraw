@@ -1,15 +1,14 @@
 # FFTdraw
 
-Read an FFT frequency-intensity plot drawn by hand, and generate sound from it - v0.3
+Read an FFT frequency-intensity plot drawn by hand, and generate sound from it.
 
 A little experiment with sounds. Not really user-friendly, well-optimized, or useful, but it is capable of making a wide range of strange sounds by changing the plot and the _fft_length_ parameter. I'll gladly accept any bug reports.
 
 # Possible updates
 
- - [x] An option to smoothen the lines and make the sound wider/deeper/mellower, ideally after setting up all the waypoints.
- - [ ] The program malfunctions when using a NumPy array to convert to sound in the final step (FFT is fine). I don't yet know why...
+ - [x] An option to smoothen the lines and make the sound wider/deeper/mellower.
  - [x] No more fuss with MS Paint: switching to Matplotlib. It'll feature easier drawing, customizable scaling of the FFT plot, and an option to display the waveform.
- - [ ] An API to take input data and draw peaks automatically.
+ - [ ] <s>An API to take input data and draw peaks automatically.</s> I don't think it's needed, if you have FFT data you can simply run iFFT for the sound.
  - [x] An option to pad the input with zeros to increase frequency domain resolution. Achieved by inputing different _lim_x_ and _fft_length_ parameters.
 
 # Usage
@@ -40,5 +39,6 @@ The program works as follows:
 4. Take the real parts only of _samples_ifft_ and add them to samples.
 5. Use _AudioSegment._spawn(samples)_ to generate the sound.
 
+In the last step, the program malfunctions when _samples_ is a NumPy array, generating noise. So I had to use array.array to store the samples.
 
 License: MIT license.
