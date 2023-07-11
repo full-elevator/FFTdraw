@@ -1,31 +1,44 @@
 # FFTdraw
 
-Read an FFT frequency-intensity plot drawn by hand, and generate sound from it.
+Read an FFT frequency-intensity plot drawn by hand, and generate sound from it - v0.4
 
 A little experiment with sounds. Not really user-friendly, well-optimized, or useful, but it is capable of making a wide range of strange sounds by changing the plot and the _fft_length_ parameter. I'll gladly accept any bug reports.
 
 # Possible updates
 
- - [x] An option to smoothen the lines and make the sound wider/deeper/mellower.
- - [x] No more fuss with MS Paint: switching to Matplotlib. It'll feature easier drawing, customizable scaling of the FFT plot, and an option to display the waveform.
- - [ ] <s>An API to take input data and draw peaks automatically.</s> I don't think it's needed, if you have FFT data you can simply run iFFT for the sound.
- - [x] An option to pad the input with zeros to increase frequency domain resolution. Achieved by inputing different _lim_x_ and _fft_length_ parameters.
+ - [ ] An option to take a short audio segment as input and edit its spectrum.
+
+# This commit
+
+ - Changed the method of interaction. Now, peaks are drawn at the position of the cursor whenever the key _1_ is pressed, allowing use of the built-in zoom and pan tools in matplotlib.
+ - Added a display for waypoints used in curve smoothening.
+ - Rewrote a few clumsy chunks of code.
+
+# Previous commits
+
+ - Added an option to pad the input with zeros to increase frequency domain resolution. Achieved by inputing different _lim_x_ and _fft_length_ parameters.
+ - Added line smoothening to make the sound wider/deeper/mellower.
+ - Removed the MS Paint-based input (bad!) in the initial commit.
 
 # Usage
 
 Input the parameters in the following order, separated by a space:
-1. right limit of x axis (default 800);
-2. n of sampling points in a single segment (default 4410);
-3. applied effects: f to fade out and/or n to normalize (default n);
-4. number of sampling points to plot: not plotted if 0 (default 0);
-5. export path: if omitted, no file is exported (default None).
+ - right limit of x axis (default 800);
+ - n of sampling points in a single segment (default 4410);
+ - applied effects: f to fade out and/or n to normalize (default n);
+ - number of sampling points to plot: not plotted if 0 (default 0);
+ - export path: if omitted, no file is exported (default None).
 
-After the inputs are processed, a Matplotlib window with two subplots will pop up. In the subplots:
-* Left click to add a data point;
-* Right click to add a solitary peak;
-* Press "r" or "(" to smoothen the real part curve;
-* Press "i" or ")" to smoothen the imaginary part curve;
-* Enter to hear the sound.
+When the plot window is focused:
+ - "1" (the number) to add a solitary peak;
+ - Hold down "1" and move the cursor to draw a line;
+ - "r" or "(" to smoothen the real part curve;
+ - "i" or ")" to smoothen the imaginary part curve;
+ - and "Enter" to hear the sound.
+
+The smooth curve is calculated based on the black X waypoints.
+
+Try setting "800 800" for the parameters to remove jitter.
 
 # Technical details
 
@@ -36,9 +49,9 @@ The program works as follows:
     2. Get a slice with length _resolution_, and append the maximum _sample_ among them to _samples_fft_.
     3. Loop until the end of the values array.
 3. Calculate an inverse FFT on _samples_fft_, putting the result in _samples_ifft_.
-4. Take the real parts only of _samples_ifft_ and add them to samples.
+4. Take the real part of _samples_ifft_ and add them to _samples_.
 5. Use _AudioSegment._spawn(samples)_ to generate the sound.
 
-In the last step, the program malfunctions when _samples_ is a NumPy array, generating noise. So I had to use array.array to store the samples.
+In the last step, the code malfunctions when _samples_ is a NumPy ndarray, generating noise. Using array.array to store the samples fixes the issue.
 
 License: MIT license.
