@@ -6,7 +6,8 @@ A little experiment with sounds. Not really user-friendly, well-optimized, or us
 
 # Possible updates
 
- - [ ] An option to take a short audio segment as input and edit its spectrum.
+ - [ ] An option to take a short audio segment as input and edit its spectrum. This is harder than I thought; I was first lost in some weird bug, then drowned by floods of error code, then confused over the unit conversions.
+ - [ ] Change the command to a batch-like syntax. Note to self: if ever doing a project of this size, determine the mode of input early instead of keep changing it along the route...
 
 # This commit
 
@@ -16,7 +17,7 @@ A little experiment with sounds. Not really user-friendly, well-optimized, or us
 
 # Previous commits
 
- - Added an option to pad the input with zeros to increase frequency domain resolution. Achieved by inputing different _lim_x_ and _fft_length_ parameters.
+ - Added an option to pad the input with zeros to increase frequency domain resolution. Achieved by setting different _lim_x_ and _fft_length_ parameters.
  - Added line smoothening to make the sound wider/deeper/mellower.
  - Removed the MS Paint-based input (bad!) in the initial commit.
 
@@ -30,13 +31,13 @@ Input the parameters in the following order, separated by a space:
  - export path: if omitted, no file is exported (default None).
 
 When the plot window is focused:
- - "1" (the number) to add a solitary peak;
+ - Press "1" (the number) to add a solitary peak;
  - Hold down "1" and move the cursor to draw a line;
  - "r" or "(" to smoothen the real part curve;
  - "i" or ")" to smoothen the imaginary part curve;
  - and "Enter" to hear the sound.
 
-The smooth curve is calculated based on the black X waypoints.
+The smooth curve is calculated based on the black X waypoints, which are not part of the actual spectrum data.
 
 Try setting "800 800" for the parameters to remove jitter.
 
